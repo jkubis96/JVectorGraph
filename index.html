@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plot Editor</title>
@@ -23,8 +24,8 @@
         }
         #svg-container {
             width: 100%;
-            height: calc(100vh + 60px); /* Toolbar height */
-            overflow: auto; /* Enable scrollbars for larger content */
+            height: calc(100vh + 60px); 
+            overflow: auto; 
             position: relative;
             background-color: #eaeaea;
         }
@@ -36,7 +37,7 @@
             background-color: rgb(255, 255, 255);
             transform-origin: center;
             cursor: pointer;
-            display: block; /* Prevent extra space below the SVG */
+            display: block; 
         }
         .selected {
             stroke: rgb(255, 0, 0) !important;
@@ -54,12 +55,11 @@
             cursor: pointer;
             padding: 5px 10px;
             font-size: 14px;
-            margin-right: 10px;
+            margin-right: 2px;
         }
 
 
 
-        /* Styling for buttons with icons */
         .icon-button {
             padding: 8px;
             font-size: 20px;
@@ -83,13 +83,23 @@
     <div class="toolbar">
         <input type="file" id="file-input" accept=".svg">
 
-
+        <button id="adjustButton">
+            <i class="fa-solid fa-expand"></i>
+        </button>
+        
         <button id="delete-element">
             <i class="fa-solid fa-eraser"></i>
         </button>
 
+        <button id="undo">
+            <i class="fa-solid fa-arrow-left"></i>
+        </button>
 
-        <label for="move-step">Step points:</label>
+        <button id="redo">
+            <i class="fa-solid fa-arrow-right"></i>
+        </button>
+
+        <label for="move-step">Shift:</label>
 
         <select id="move-step">
             <option value="0.1">0.1</option>
@@ -102,20 +112,34 @@
 
         </select>
 
+        <label for="resize">Resize:</label>
 
-        <button id="undo">
-            <i class="fa-solid fa-arrow-left"></i>
+        <select id="resize">
+            <option value="0.1" selected>0.1</option>
+            <option value="0.2">0.2</option>
+            <option value="0.3">0.3</option>
+            <option value="0.4">0.4</option>
+            <option value="0.5">0.5</option>
+            <option value="0.6">0.6</option>
+            <option value="0.7">0.7</option>
+            <option value="0.8">0.8</option>
+            <option value="0.9">0.9</option>
+            <option value="1.0">1.0</option>
+
+        </select>
+
+        <button id="zoomIn">
+            <i class="fa-solid fa-plus"></i>
         </button>
 
-        <button id="redo">
-            <i class="fa-solid fa-arrow-right"></i>
+        <button id="zoomOut">
+            <i class="fa-solid fa-minus"></i>
         </button>
 
 
         <button id="move-to-top">
             <i class="fa-solid fa-arrow-up"></i>
         </button>
-
 
         <button id="move-to-bottom">
             <i class="fa-solid fa-arrow-down"></i>
@@ -148,12 +172,16 @@
             <i class="fa-solid fa-file-export"></i>
         </button>
 
+        
+
+
 
 
     </div>
     <div id="svg-container">
         <div id="svg-wrapper">
             <svg id="svg-editor" xmlns="http://www.w3.org/2000/svg"></svg>
+            
         </div>
         <div id="selection-rectangle"></div>
     </div>
@@ -173,10 +201,12 @@
         const moveToTopButton = document.getElementById('move-to-top');
         const moveToBottomButton = document.getElementById('move-to-bottom');
         const svg = document.querySelector('svg');
-        const colorPicker = document.getElementById('color-picker'); // Color picker input
+        const colorPicker = document.getElementById('color-picker'); 
         const applyColorButton = document.getElementById('apply-color');
         const moveStepSelect = document.getElementById('move-step');
 
+
+        
 
         let selectedElements = [];
         let isSelecting = false;
@@ -186,19 +216,128 @@
         let redoStack = [];
 
 
-  
+        function adjustBackground() {
+
+            saveState();
+
+            if (selectedElements.length === 0) {
+                console.warn("Brak zaznaczonych elementów.");
+                return;
+            }
+
+            const rectWidth = parseFloat(selectionRectangle.style.width);
+            const rectHeight = parseFloat(selectionRectangle.style.height);
+
+            if (isNaN(rectWidth) || isNaN(rectHeight) || rectWidth === 0 || rectHeight === 0) {
+                console.warn("Wymiary selectionRectangle są nieprawidłowe.");
+                return; 
+            }
+
+            const rectX = parseFloat(selectionRectangle.getAttribute('x'));
+            const rectY = parseFloat(selectionRectangle.getAttribute('y'));
+
+            const bbox = {
+                x: rectX,
+                y: rectY,
+                width: rectWidth,
+                height: rectHeight
+            };
+
+            svgEditor.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
+            svgEditor.setAttribute('width', `${bbox.width}`);
+            svgEditor.setAttribute('height', `${bbox.height}`);
+
+            svgEditor.style.removeProperty('width');
+            svgEditor.style.removeProperty('height');
+            svgWrapper.style.removeProperty('width');
+            svgWrapper.style.removeProperty('height');
+
+            console.log('SVG zostało zmodyfikowane:', {
+                viewBox: svgEditor.getAttribute('viewBox'),
+                width: svgEditor.getAttribute('width'),
+                height: svgEditor.getAttribute('height')
+            });
+        }
+
+
+
+
+        function scaleSelectedElements(factor) {
+            if (typeof factor !== "number" || factor <= 0) {
+                console.error("Skalowanie wymaga dodatniego współczynnika liczbowego.");
+                return;
+            }
+
+            if (!selectedElements || selectedElements.length === 0) {
+                console.warn("Nie wybrano żadnych elementów.");
+                return;
+            }
+
+            selectedElements.forEach(el => {
+                const currentTransform = el.getAttribute("transform") || "";
+                console.log('Current transform:', currentTransform); 
+
+                const transformParts = currentTransform.trim().split(/\s+/);
+
+                let scaleFound = false;
+                const updatedTransformParts = transformParts.map(part => {
+                    const scaleRegex = /^scale\(([^)]+)\)$/;
+
+                    if (scaleRegex.test(part)) {
+                        scaleFound = true;
+                        return part.replace(scaleRegex, (_, scale) => {
+                            const newScale = parseFloat(scale) * factor;
+                            return `scale(${newScale})`;
+                        });
+                    }
+                    return part;
+                });
+
+                if (!scaleFound) {
+                    updatedTransformParts.push(`scale(${factor})`);
+                }
+
+                const updatedTransform = updatedTransformParts.join(" ").trim();
+                el.setAttribute("transform", updatedTransform);
+            });
+
+            try {
+                saveState();
+                console.log("Stan zapisany.");
+            } catch (error) {
+                console.error("Nie udało się zapisać stanu:", error);
+            }
+        }
+
+        document.getElementById('adjustButton').addEventListener('click', adjustBackground);
+
+
+
+        document.getElementById("zoomIn").addEventListener("click", () => {
+            saveState();
+            const resizeValue = parseFloat(document.getElementById('resize').value); 
+            console.log('Zoom In Factor:', 1 + resizeValue); 
+            scaleSelectedElements(1 + resizeValue); 
+        });
+
+        document.getElementById("zoomOut").addEventListener("click", () => {
+            saveState();
+            const resizeValue = parseFloat(document.getElementById('resize').value); 
+            console.log('Zoom Out Factor:', 1 - resizeValue); 
+            scaleSelectedElements(1 - resizeValue); 
+        });
+
+        
         applyColorButton.addEventListener('click', () => {
             if (selectedElements.length > 0) {
 
                 saveState();
 
-                const color = colorPicker.value;  // Pobieramy wybrany kolor z inputa
+                const color = colorPicker.value;  
                 selectedElements.forEach(el => {
-                    // Zmieniamy kolor wypełnienia i konturu przez atrybuty
                     el.setAttribute('fill', color);
                     el.setAttribute('stroke', color);
 
-                    // Dodatkowo, zmieniamy przez styl CSS
                     el.style.fill = color;
                     el.style.stroke = color;
 
@@ -210,67 +349,60 @@
 
 
         svgEditor.addEventListener('click', (e) => {
-        if (e.target !== svgEditor) {  // Sprawdzamy, czy kliknięty obiekt to nie samo SVG
-            // Usuwamy klasę 'selected' ze wszystkich elementów
+        if (e.target !== svgEditor) {  
+
             svgEditor.querySelectorAll('*').forEach(el => el.classList.remove('selected'));
             selectedElement = e.target;
-            selectedElement.classList.add('selected');  // Dodajemy klasę 'selected' do klikniętego elementu
+            selectedElement.classList.add('selected');  
         }
 
         });
 
 
-        // Po kliknięciu przycisku 'Apply Color' zmieniamy kolor wybranego elementu
         applyColorButton.addEventListener('click', () => {
             if (selectedElement) {
-                const selectedColor = colorPicker.value; // Pobieramy wybrany kolor z inputa
-                selectedElement.setAttribute('fill', selectedColor);  // Zmieniamy kolor wypełnienia
-                selectedElement.setAttribute('stroke', selectedColor); // Zmieniamy kolor konturu
+                const selectedColor = colorPicker.value;
+                selectedElement.setAttribute('fill', selectedColor);  
+                selectedElement.setAttribute('stroke', selectedColor); 
             } else {
                 alert('Please select an SVG element first!');
             }
         });
 
-        // Funkcja przesuwająca element na wierzch
         function moveToTop() {
             selectedElements.forEach(el => {
-                el.parentNode.appendChild(el); // Przenosimy element na koniec kontenera
+                el.parentNode.appendChild(el); 
             });
-            saveState(); // Zapisujemy stan do historii
+            saveState(); 
         }
 
-        // Funkcja przesuwająca element na spód
         function moveToBottom() {
             selectedElements.forEach(el => {
-                el.parentNode.insertBefore(el, el.parentNode.firstChild); // Przenosimy element na początek kontenera
+                el.parentNode.insertBefore(el, el.parentNode.firstChild); 
             });
-            saveState(); // Zapisujemy stan do historii
+            saveState(); 
         }
 
-        // Obsługa kliknięć przycisków
         moveToTopButton.addEventListener('click', moveToTop);
         moveToBottomButton.addEventListener('click', moveToBottom);
 
-        // Save current state to history
         function saveState() {
             selectedElements.forEach(el => {
-                    // Zresetuj klasę zaznaczenia
                     el.classList.remove('selected');
                 });
                 
             const serializer = new XMLSerializer();
             history.push(serializer.serializeToString(svgEditor));
-            redoStack = []; // Clear redo stack after new action
+            redoStack = []; 
         }
 
-        // Undo functionality
         
         undoButton.addEventListener('click', () => {
             if (history.length > 0) {
                 redoStack.push(history.pop());
                 svgEditor.innerHTML = history[history.length - 1] || '';
-                clearSelection(); // Wyczyść zaznaczenie
-                attachEventListeners(); // Ponownie przypisz zdarzenia
+                clearSelection(); 
+                attachEventListeners(); 
             }
         });
 
@@ -278,38 +410,33 @@
             if (redoStack.length > 0) {
                 history.push(redoStack.pop());
                 svgEditor.innerHTML = history[history.length - 1];
-                clearSelection(); // Wyczyść zaznaczenie
-                attachEventListeners(); // Ponownie przypisz zdarzenia
+                clearSelection(); 
+                attachEventListeners(); 
             }
         });
 
 
-        // Attach event listeners to SVG elements - del?
         function attachEventListeners() {
-            // Nasłuchujemy kliknięć w całym dokumencie
             document.addEventListener('click', (e) => {
-                // Sprawdzamy, czy kliknięto poza obiektami SVG
                 if (!svgEditor.contains(e.target)) {
-                    clearSelection(); // Jeśli tak, odznaczamy wszystko
+                    clearSelection(); 
                 }
             });
 
-            // Dodajemy nasłuchiwanie dla każdego elementu wewnątrz svgEditor
             svgEditor.querySelectorAll('*').forEach(element => {
                 element.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Zapobiegamy propagacji zdarzenia, by nie wywołać eventu z dokumentu
+                    e.stopPropagation(); 
                     if (e.ctrlKey) {
-                        toggleSelection(element); // Włączamy/wyłączamy zaznaczenie elementu
+                        toggleSelection(element); 
                     } else {
-                        clearSelection(); // Zaczynamy odznaczanie
-                        selectElement(element); // Zaznaczamy kliknięty element
+                        clearSelection(); 
+                        selectElement(element); 
                     }
                 });
             });
         } 
 
 
-        // Zmieniamy sposób zaznaczania, by obsługiwało pojedyncze litery
         function selectElement(element) {
             if (!selectedElements.includes(element)) {
                 selectedElements.push(element);
@@ -335,7 +462,6 @@
             selectedElements = [];
         }
 
-        // Rectangle selection
         svgEditor.addEventListener('mousedown', (e) => {
             if (!e.ctrlKey) {
                 isSelecting = true;
@@ -379,7 +505,6 @@
             }
         });
 
-        // Delete selected elements
         deleteElementButton.addEventListener('click', deleteSelectedElements);
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Delete') {
@@ -389,10 +514,9 @@
         });
 
 
-        // Cancel selected elements
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                clearSelection(); // Wywołaj funkcję czyszczącą zaznaczenie
+                clearSelection(); 
             }
         });
 
@@ -400,19 +524,14 @@
 
         function deleteSelectedElements() {
             if (selectedElements.length > 0) {
-                // Przed zapisaniem stanu, przywróć kolor bazowy (zresetuj klasy)
                 selectedElements.forEach(el => {
-                    // Zresetuj klasę zaznaczenia
                     el.classList.remove('selected');
                 });
 
-                // Zapisz stan przed usunięciem elementów
                 saveState(); 
 
-                // Usuń zaznaczone elementy
                 selectedElements.forEach(el => el.remove());
 
-                // Wyczyść zaznaczenie
                 clearSelection();
             }
         }
@@ -420,57 +539,47 @@
 
         // Save file
         saveFileButton.addEventListener('click', () => {
-            const format = saveFormatSelect.value; // Wybór formatu (png/jpg/svg)
-            const resolution = parseInt(document.getElementById('resolution').value, 10); // Pobranie wybranego DPI
+            const format = saveFormatSelect.value; 
+            const resolution = parseInt(document.getElementById('resolution').value, 10); 
             const serializer = new XMLSerializer();
-            const svgData = serializer.serializeToString(svgEditor); // Serializacja SVG (plik źródłowy)
+            const svgData = serializer.serializeToString(svgEditor); 
 
-            // Funkcja obliczania współczynnika skalowania na podstawie DPI
             const getScaleFactor = (resolution) => {
-                const defaultDPI = 96; // Standardowe DPI
-                return resolution / defaultDPI; // Współczynnik skalowania
+                const defaultDPI = 96; 
+                return resolution / defaultDPI; 
             };
 
 
             const scaleFactor = getScaleFactor(resolution);
 
             if (format === 'svg') {
-                // Zapis SVG bez zmian
                 const blob = new Blob([svgData], { type: 'image/svg+xml' });
                 downloadFile(blob, 'image.svg');
             } else {
-                // Obsługa PNG/JPG
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
                 const img = new Image();
 
                 img.onload = () => {
                     try {
-                        // Pobranie rzeczywistych wymiarów SVG
                         const svgWidth = svgEditor.clientWidth;
                         const svgHeight = svgEditor.clientHeight;
 
-                        // Obliczenie wymiarów canvasu na podstawie DPI
                         const width = svgWidth * scaleFactor;
                         const height = svgHeight * scaleFactor;
 
-                        // Ustawienie wymiarów canvasu
                         canvas.width = width;
                         canvas.height = height;
 
-                        // Ustawienie skalowania (dopasowanie do DPI)
                         context.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
 
-                        // Jeśli zapisujemy do JPG, wypełniamy tło białym kolorem
                         if (format === 'jpeg' || format === 'jpg') {
                             context.fillStyle = 'white';
                             context.fillRect(0, 0, canvas.width, canvas.height);
                         }
 
-                        // Rysujemy SVG na canvasie
                         context.drawImage(img, 0, 0, svgWidth, svgHeight);
 
-                        // Zapisujemy obraz jako plik PNG/JPG
                         canvas.toBlob((blob) => {
                             if (blob) {
                                 downloadFile(blob, `image.${format}`);
@@ -483,12 +592,10 @@
                     }
                 };
 
-                // Jeśli wystąpi błąd ładowania obrazu
                 img.onerror = (error) => {
                     console.error('Nie udało się załadować obrazu SVG jako źródła:', error);
                 };
 
-                // Tworzymy URL z SVG i ustawiamy go jako źródło obrazu
                 const svgBlob = new Blob([svgData], { type: 'image/svg+xml' });
                 const svgUrl = URL.createObjectURL(svgBlob);
                 img.src = svgUrl;
@@ -496,20 +603,17 @@
         });
 
 
-        // Funkcja do pobierania pliku
         function downloadFile(blob, filename) {
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = filename;
             link.click();
 
-            // Zwalniamy pamięć
             URL.revokeObjectURL(link.href);
         }
 
    
 
-        // Delete selected elements
         deleteElementButton.addEventListener('click', () => {
             selectedElements.forEach(el => el.remove());
             clearSelection();
@@ -518,13 +622,11 @@
 
      
 
-        // Move selected elements with keyboard
        
         document.addEventListener('keydown', (e) => {
             if (selectedElements.length > 0) {
                 let dx = 0, dy = 0;
 
-                // Pobieramy wartość przesunięcia wybraną przez użytkownika
                 const moveStep = parseFloat(moveStepSelect.value);
 
                 switch (e.key) {
@@ -547,11 +649,9 @@
                 e.preventDefault();
 
                 selectedElements.forEach(el => {
-                    // Pobierz aktualną transformację
                     let transform = el.getAttribute('transform') || '';
                     let translateX = 0, translateY = 0;
 
-                    // Sprawdź, czy transformacja już istnieje
                     const translateMatch = transform.match(/translate\(([^)]+)\)/);
                     if (translateMatch) {
                         const [x, y] = translateMatch[1].split(/[\s,]+/).map(parseFloat);
@@ -559,7 +659,6 @@
                         translateY = y || 0;
                     }
 
-                    // Oblicz nową transformację
                     const newTranslate = `translate(${translateX + dx}, ${translateY + dy})`;
 
                     if (translateMatch) {
@@ -568,10 +667,8 @@
                         transform = `${transform} ${newTranslate}`.trim();
                     }
 
-                    // Zapisz nową transformację
                     el.setAttribute('transform', transform);
 
-                    // Sprawdź, czy element nadal mieści się w kontenerze SVG
                     const bbox = el.getBBox();
                     const svgBBox = svgEditor.getBBox();
                     if (
@@ -584,44 +681,37 @@
                     }
                 });
 
-                saveState(); // Zapisz stan do historii
+                saveState(); 
             }
         });
 
         
 
 
-        // Funkcja rozbijająca grupy na elementy główne
         function flattenSvgGroups(svgElement) {
             svgElement.querySelectorAll('g').forEach((group) => {
                 const parent = group.parentNode;
                 const groupTransform = group.getAttribute('transform') || '';
 
                 Array.from(group.children).forEach((child) => {
-                    // Pobierz transformację dziecka
                     const childTransform = child.getAttribute('transform') || '';
 
-                    // Połącz transformację grupy z transformacją dziecka
                     const combinedTransform = `${groupTransform} ${childTransform}`.trim();
                     child.setAttribute('transform', combinedTransform);
 
-                    // Usuń atrybut clip-path z każdego dziecka, aby uniknąć ucinania
                     child.removeAttribute('clip-path');
 
-                    // Przenieś dziecko do rodzica
                     parent.insertBefore(child, group);
                 });
 
-                group.remove(); // Usuń pustą grupę
+                group.remove(); 
             });
         }
 
 
-        // Funkcja nadawania unikalnych ID
         function assignUniqueIds(svgElement) {
             let idCounter = 0;
             svgElement.querySelectorAll('path, rect, circle, ellipse, polygon').forEach((element) => {
-                // Nadajemy unikalny ID tylko tym elementom, które go nie mają
                 if (!element.id) {
                     element.id = `element-${idCounter++}`;
                 }
@@ -629,7 +719,6 @@
         }
 
 
-        // Obsługa ładowania SVG
         fileInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file && file.type === 'image/svg+xml') {
@@ -638,7 +727,6 @@
                     svgEditor.innerHTML = e.target.result;
                     const svgElement = svgEditor.querySelector('svg');
 
-                    // Usuwamy tło, rozbijamy grupy, nadajemy unikalne ID
                     flattenSvgGroups(svgElement);
                     assignUniqueIds(svgElement);
 
