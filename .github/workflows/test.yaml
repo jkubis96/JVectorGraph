@@ -24,6 +24,7 @@ jobs:
       - name: Install Poetry
         run: |
           pip install pytest
+          pip install setuptools
 
       - name: Install dependencies using Poetry
         run: |
