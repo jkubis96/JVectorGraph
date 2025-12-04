@@ -1,26 +1,25 @@
-import webbrowser
-import os
-import urllib.parse
 import http.server
+import os
 import socketserver
 import threading
-from matplotlib.figure import Figure
-import pkg_resources
+import urllib.parse
+import webbrowser
+
 import matplotlib.pyplot as plt
+import pkg_resources
 from matplotlib import rc
-rc("svg", fonttype='path')
-import time
-import networkx as nx
-import tkinter as tk
+from matplotlib.figure import Figure
+
+rc("svg", fonttype="path")
 import re
+import time
+import tkinter as tk
+
+import networkx as nx
 from pyvis.network import Network
 
 
-
-
-
 class MplEditor:
-
     """
     Browser-based SVG editor for Matplotlib figures.
 
@@ -44,15 +43,6 @@ class MplEditor:
     _cwd : str
         Original working directory restored after editing.
 
-    Examples
-    --------
-    Create a simple plot and edit it in the browser:
-
-    >>> import matplotlib.pyplot as plt
-    >>> from editor import MplEditor
-    >>> fig, ax = plt.subplots()
-    >>> ax.plot([1, 2, 3], [3, 1, 4])
-    >>> MplEditor(fig).edit()  # doctest: +SKIP
 
     Notes
     -----
@@ -60,9 +50,8 @@ class MplEditor:
     - The editor is served on ``http://localhost:8005``.
     - The browser is automatically opened when calling :meth:`edit`.
     """
-    
-    def __init__(self, figure:Figure):
-        
+
+    def __init__(self, figure: Figure):
         """
         Initialize an instance of :class:`MplEditor`.
 
@@ -92,17 +81,14 @@ class MplEditor:
         """
 
         self.figure = figure
+
         def get_package_directory():
-            return pkg_resources.resource_filename(__name__, '')
-        
+            return pkg_resources.resource_filename(__name__, "")
+
         self._package_path = get_package_directory()
         self._cwd = os.getcwd()
 
-        
-        
-
     def save_tmp(self):
-
         """
         Save the Matplotlib figure as an SVG file named ``tmp.svg``.
 
@@ -114,10 +100,13 @@ class MplEditor:
         None
         """
 
-        self.figure.savefig(os.path.join(self._package_path, 'tmp.svg'), format='svg', bbox_inches='tight', transparent=True)
+        self.figure.savefig(
+            os.path.join(self._package_path, "tmp.svg"),
+            format="svg",
+            bbox_inches="tight",
+            transparent=True,
+        )
 
-        
-    
     def run_server(self):
         """
         Start a blocking HTTP server on port 8005.
@@ -130,18 +119,15 @@ class MplEditor:
         - This method blocks execution until the process is terminated.
         - Typically it is run in a daemon thread by :meth:`edit`.
         """
-        
+
         os.chdir(self._package_path)
-        
+
         socketserver.TCPServer.allow_reuse_address = True
         handler = http.server.SimpleHTTPRequestHandler
         handler.directory = self._package_path
         httpd = socketserver.TCPServer(("", 8005), handler)
         httpd.serve_forever()
-        
 
-       
-        
     def open_in_browser(self):
         """
         Open the built-in HTML editor in the system web browser.
@@ -155,8 +141,8 @@ class MplEditor:
         """
         os.chdir(self._package_path)
 
-        file_path = 'vecedit.html'
-        argument = 'tmp.svg'
+        file_path = "vecedit.html"
+        argument = "tmp.svg"
 
         file_path = file_path.replace("\\", "/")
         argument = argument.replace("\\", "/")
@@ -164,9 +150,6 @@ class MplEditor:
         url_with_argument = f"http://localhost:8005/{os.path.basename(file_path)}?graph={urllib.parse.quote(argument)}"
 
         webbrowser.open(url_with_argument)
-    
-
-        
 
     def del_tmp(self):
         """
@@ -177,14 +160,12 @@ class MplEditor:
         None
         """
         try:
-            if os.path.exists(os.path.join(self._package_path, 'tmp.svg')):
-                os.remove(os.path.join(self._package_path, 'tmp.svg'))
+            if os.path.exists(os.path.join(self._package_path, "tmp.svg")):
+                os.remove(os.path.join(self._package_path, "tmp.svg"))
         except:
             pass
-    
-    
+
     def edit(self):
-        
         """
         Launch the full browser-based editing workflow.
 
@@ -205,18 +186,15 @@ class MplEditor:
         server_thread = threading.Thread(target=self.run_server, daemon=True)
         server_thread.start()
         time.sleep(5)
-        
+
         self.open_in_browser()
-        
+
         time.sleep(10)
-        
+
         os.chdir(self._cwd)
 
-        
-   
 
-class NxEditor():
-
+class NxEditor:
     """
     Interactive editor for NetworkX graphs based on pyvis.
 
@@ -254,7 +232,7 @@ class NxEditor():
     >>> import networkx as nx
     >>> from editor import NxEditor
     >>> G = nx.cycle_graph(4)
-    >>> NxEditor(G).edit() 
+    >>> NxEditor(G).edit()
 
     Notes
     -----
@@ -262,8 +240,7 @@ class NxEditor():
     NetworkX graph object in Python.
     """
 
-    def __init__(self, network:nx.Graph):
-        
+    def __init__(self, network: nx.Graph):
         """
         Initialize an instance of :class:`NxEditor`.
 
@@ -285,7 +262,7 @@ class NxEditor():
         _package_path : str
             Absolute path to the package directory used to store temporary HTML
             files and related resources.
-            
+
         _cwd : str
             Original working directory, restored after :meth:`edit` completes.
 
@@ -296,14 +273,14 @@ class NxEditor():
         """
 
         self.network = network
+
         def get_package_directory():
-            return pkg_resources.resource_filename(__name__, '')
-        
+            return pkg_resources.resource_filename(__name__, "")
+
         self._package_path = get_package_directory()
         self._cwd = os.getcwd()
 
     def edit(self):
-       
         """
         Generate and open an interactive pyvis-based graph editor.
 
@@ -319,25 +296,25 @@ class NxEditor():
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
         root.destroy()
-    
+
         desired_height = int(screen_height * 0.8)
         desired_width = int(screen_width * 0.99)
-    
-        net = Network(notebook=True, height=f"{desired_height}px", width=f"{desired_width}px")
+
+        net = Network(
+            notebook=True, height=f"{desired_height}px", width=f"{desired_width}px"
+        )
         net.from_nx(self.network)
         net.repulsion(node_distance=150, spring_length=200)
-    
-        file_path = os.path.join(self._package_path, 'tmp.html')
-        
-        
+
+        file_path = os.path.join(self._package_path, "tmp.html")
+
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
         except:
             pass
-        
+
         net.show(file_path)
-    
 
         js_code = """
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -758,20 +735,17 @@ class NxEditor():
 
         with open(file_path, "r", encoding="utf-8") as file:
             html_content = file.read()
-            
-        font_awesome_link = '<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">'
-        html_content = re.sub(r"(<head>)", r"\1\n" + font_awesome_link, html_content, flags=re.IGNORECASE)
-        
-        modified_html = re.sub(r"(</body>)", js_code + "</body>", html_content, flags=re.IGNORECASE)
 
-    
+        font_awesome_link = '<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">'
+        html_content = re.sub(
+            r"(<head>)", r"\1\n" + font_awesome_link, html_content, flags=re.IGNORECASE
+        )
+
+        modified_html = re.sub(
+            r"(</body>)", js_code + "</body>", html_content, flags=re.IGNORECASE
+        )
+
         with open(file_path, "w", encoding="utf-8") as file:
             file.write(modified_html)
-    
-        webbrowser.open(file_path)
-        
-        
-        
-        
 
-       
+        webbrowser.open(file_path)

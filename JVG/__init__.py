@@ -11,13 +11,13 @@ pattern = r"""
 
 print(pattern)
 
-print('')
+print("")
 
-print('')
+print("")
 
-print('Welcome in JVectorGraph v.1.0.2 library')
-print('')
-print('Loading required packages...')
+print("Welcome in JVectorGraph v.1.0.2 library")
+print("")
+print("Loading required packages...")
 
 
-print('JVectorGraph is ready to use')
+print("JVectorGraph is ready to use")
