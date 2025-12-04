@@ -20,9 +20,77 @@ from pyvis.network import Network
 
 
 class MplEditor:
+
+    """
+    Browser-based SVG editor for Matplotlib figures.
+
+    This class converts a Matplotlib figure into an SVG file and opens it in a
+    custom HTML editor served on a lightweight HTTP server. The editor allows
+    interactive manipulation of the SVG image inside a web browser.
+
+    Parameters
+    ----------
+    figure : matplotlib.figure.Figure
+        The Matplotlib figure that will be exported as a temporary SVG file.
+
+    Attributes
+    ----------
+    figure : matplotlib.figure.Figure
+        Input Matplotlib figure.
+
+    _package_path : str
+        Absolute path to the package directory used to store temporary files.
+
+    _cwd : str
+        Original working directory restored after editing.
+
+    Examples
+    --------
+    Create a simple plot and edit it in the browser:
+
+    >>> import matplotlib.pyplot as plt
+    >>> from editor import MplEditor
+    >>> fig, ax = plt.subplots()
+    >>> ax.plot([1, 2, 3], [3, 1, 4])
+    >>> MplEditor(fig).edit()  # doctest: +SKIP
+
+    Notes
+    -----
+    - A temporary file ``tmp.svg`` is created inside the package directory.
+    - The editor is served on ``http://localhost:8005``.
+    - The browser is automatically opened when calling :meth:`edit`.
+    """
     
     def __init__(self, figure:Figure):
         
+        """
+        Initialize an instance of :class:`MplEditor`.
+
+        This constructor stores the input Matplotlib figure, determines the
+        package directory used for temporary files, and saves the current
+        working directory so that it can be restored after editing.
+
+        Parameters
+        ----------
+        figure : matplotlib.figure.Figure
+            The Matplotlib figure that will be exported as a temporary SVG file.
+
+        Attributes
+        ----------
+        figure : matplotlib.figure.Figure
+            The input Matplotlib figure to be displayed in the browser editor.
+
+        _package_path : str
+            Absolute path to the package directory where temporary files are stored.
+
+        _cwd : str
+            Original working directory, restored at the end of :meth:`edit`.
+
+        Notes
+        -----
+        The package directory is obtained using :func:`pkg_resources.resource_filename`.
+        """
+
         self.figure = figure
         def get_package_directory():
             return pkg_resources.resource_filename(__name__, '')
@@ -34,12 +102,34 @@ class MplEditor:
         
 
     def save_tmp(self):
+
+        """
+        Save the Matplotlib figure as an SVG file named ``tmp.svg``.
+
+        The file is written inside the package directory and overwrites
+        any existing version.
+
+        Returns
+        -------
+        None
+        """
+
         self.figure.savefig(os.path.join(self._package_path, 'tmp.svg'), format='svg', bbox_inches='tight', transparent=True)
 
         
     
     def run_server(self):
-        
+        """
+        Start a blocking HTTP server on port 8005.
+
+        The server exposes the package directory so that HTML files and
+        the temporary SVG file can be accessed by the browser.
+
+        Notes
+        -----
+        - This method blocks execution until the process is terminated.
+        - Typically it is run in a daemon thread by :meth:`edit`.
+        """
         
         os.chdir(self._package_path)
         
@@ -53,7 +143,16 @@ class MplEditor:
        
         
     def open_in_browser(self):
-        
+        """
+        Open the built-in HTML editor in the system web browser.
+
+        The editor is loaded using ``vecedit.html`` and receives
+        the ``tmp.svg`` file via a query parameter.
+
+        Returns
+        -------
+        None
+        """
         os.chdir(self._package_path)
 
         file_path = 'vecedit.html'
@@ -70,7 +169,13 @@ class MplEditor:
         
 
     def del_tmp(self):
-        
+        """
+        Remove the temporary SVG file if it exists.
+
+        Returns
+        -------
+        None
+        """
         try:
             if os.path.exists(os.path.join(self._package_path, 'tmp.svg')):
                 os.remove(os.path.join(self._package_path, 'tmp.svg'))
@@ -80,6 +185,20 @@ class MplEditor:
     
     def edit(self):
         
+        """
+        Launch the full browser-based editing workflow.
+
+        Steps
+        -----
+        1. Save the Matplotlib figure to ``tmp.svg``.
+        2. Start the HTTP server in a background thread.
+        3. Open the browser with the generated editor.
+        4. Restore working directory.
+
+        Returns
+        -------
+        None
+        """
 
         self.save_tmp()
 
@@ -97,8 +216,85 @@ class MplEditor:
    
 
 class NxEditor():
+
+    """
+    Interactive editor for NetworkX graphs based on pyvis.
+
+    This class generates a temporary HTML file containing a pyvis visualization
+    of a NetworkX graph and injects custom JavaScript controls that enable:
+
+    - node selection,
+    - node deletion,
+    - undo history,
+    - physics controls,
+    - node size scaling,
+    - font size scaling,
+    - export to PNG/JPEG/SVG.
+
+    Parameters
+    ----------
+    network : networkx.Graph
+        The NetworkX graph to be visualized and edited.
+
+    Attributes
+    ----------
+    network : networkx.Graph
+        The graph displayed in the editor.
+
+    _package_path : str
+        Directory containing temporary files and resources.
+
+    _cwd : str
+        Original working directory restored after execution.
+
+    Examples
+    --------
+    Open an editable visualization of a simple graph:
+
+    >>> import networkx as nx
+    >>> from editor import NxEditor
+    >>> G = nx.cycle_graph(4)
+    >>> NxEditor(G).edit() 
+
+    Notes
+    -----
+    Editing operations occur only in the browser and do not modify the original
+    NetworkX graph object in Python.
+    """
+
     def __init__(self, network:nx.Graph):
         
+        """
+        Initialize an instance of :class:`NxEditor`.
+
+        This constructor stores the input NetworkX graph, determines the
+        package directory for temporary resources, and saves the current
+        working directory so it can be restored after the editing session.
+
+        Parameters
+        ----------
+        network : networkx.Graph
+            The NetworkX graph to be displayed and edited in the browser-based
+            pyvis interface.
+
+        Attributes
+        ----------
+        network : networkx.Graph
+            The input graph rendered by the editor.
+
+        _package_path : str
+            Absolute path to the package directory used to store temporary HTML
+            files and related resources.
+            
+        _cwd : str
+            Original working directory, restored after :meth:`edit` completes.
+
+        Notes
+        -----
+        The package directory path is resolved using
+        :func:`pkg_resources.resource_filename`.
+        """
+
         self.network = network
         def get_package_directory():
             return pkg_resources.resource_filename(__name__, '')
@@ -108,7 +304,17 @@ class NxEditor():
 
     def edit(self):
        
-    
+        """
+        Generate and open an interactive pyvis-based graph editor.
+
+        The editor is created in ``tmp.html`` inside the package directory.
+        Custom JavaScript code is injected into the HTML to enable interactive
+        editing, exporting, and layout control.
+
+        Returns
+        -------
+        None
+        """
         root = tk.Tk()
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
